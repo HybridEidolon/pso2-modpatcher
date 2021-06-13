@@ -200,43 +200,45 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
         }
     }
 
-    for file in src_1.read_dir().with_context(|| format!("Unable to read dir {} for adding files to {}", src_1.to_string_lossy(), out_file.to_string_lossy()))? {
-        let file = file.with_context(|| format!(
-            "Unable to index file while reading dir {} for adding files to {}",
-            src_1.to_string_lossy(),
-            out_file.to_string_lossy(),
-        ))?;
+    if src_1.exists() {
+        for file in src_1.read_dir().with_context(|| format!("Unable to read dir {} for adding files to {}", src_1.to_string_lossy(), out_file.to_string_lossy()))? {
+            let file = file.with_context(|| format!(
+                "Unable to index file while reading dir {} for adding files to {}",
+                src_1.to_string_lossy(),
+                out_file.to_string_lossy(),
+            ))?;
 
-        let file_name_string = file.file_name().to_string_lossy().into_owned();
-        if !g1_added_files.contains(&file_name_string) {
-            let ascii_name = AsciiString::from_ascii(file_name_string.as_bytes().to_owned())
-                .with_context(|| format!(
-                    "File name of {} is not valid ASCII",
-                    file.path().to_string_lossy(),
-                ))?;
-            let ascii_ext = match file.path().extension() {
-                Some(e) => {
-                    let e_owned = e.to_string_lossy().into_owned();
-                    AsciiString::from_ascii(e_owned.as_bytes().to_owned()).with_context(|| format!(
-                        "File extension of {} is not valid ASCII",
+            let file_name_string = file.file_name().to_string_lossy().into_owned();
+            if !g1_added_files.contains(&file_name_string) {
+                let ascii_name = AsciiString::from_ascii(file_name_string.as_bytes().to_owned())
+                    .with_context(|| format!(
+                        "File name of {} is not valid ASCII",
                         file.path().to_string_lossy(),
-                    ))?.to_owned()
-                },
-                None => bail!("File {} has no extension", file.path().to_string_lossy()),
-            };
-            let fc = std::fs::read(file.path())
-                .with_context(|| format!(
-                    "Unable to read contents of file {}",
-                    file.path().to_string_lossy(),
-                ))?;
-            let mut of = new_ia.begin_file(&ascii_name, &ascii_ext, Group::Group1);
-            of.write_all(&fc[..])
-                .with_context(|| format!(
-                    "Unable to write contents of file {} to ICE file writer",
-                    file.path().to_string_lossy(),
-                ))?;
-            of.finish();
-            g1_added_files.insert(file_name_string);
+                    ))?;
+                let ascii_ext = match file.path().extension() {
+                    Some(e) => {
+                        let e_owned = e.to_string_lossy().into_owned();
+                        AsciiString::from_ascii(e_owned.as_bytes().to_owned()).with_context(|| format!(
+                            "File extension of {} is not valid ASCII",
+                            file.path().to_string_lossy(),
+                        ))?.to_owned()
+                    },
+                    None => bail!("File {} has no extension", file.path().to_string_lossy()),
+                };
+                let fc = std::fs::read(file.path())
+                    .with_context(|| format!(
+                        "Unable to read contents of file {}",
+                        file.path().to_string_lossy(),
+                    ))?;
+                let mut of = new_ia.begin_file(&ascii_name, &ascii_ext, Group::Group1);
+                of.write_all(&fc[..])
+                    .with_context(|| format!(
+                        "Unable to write contents of file {} to ICE file writer",
+                        file.path().to_string_lossy(),
+                    ))?;
+                of.finish();
+                g1_added_files.insert(file_name_string);
+            }
         }
     }
 
@@ -300,43 +302,45 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
         }
     }
 
-    for file in src_2.read_dir().with_context(|| format!("Unable to read dir {} for adding files to {}", src_2.to_string_lossy(), out_file.to_string_lossy()))? {
-        let file = file.with_context(|| format!(
-            "Unable to index file while reading dir {} for adding files to {}",
-            src_2.to_string_lossy(),
-            out_file.to_string_lossy(),
-        ))?;
+    if src_2.exists() {
+        for file in src_2.read_dir().with_context(|| format!("Unable to read dir {} for adding files to {}", src_2.to_string_lossy(), out_file.to_string_lossy()))? {
+            let file = file.with_context(|| format!(
+                "Unable to index file while reading dir {} for adding files to {}",
+                src_2.to_string_lossy(),
+                out_file.to_string_lossy(),
+            ))?;
 
-        let file_name_string = file.file_name().to_string_lossy().into_owned();
-        if !g2_added_files.contains(&file_name_string) {
-            let ascii_name = AsciiString::from_ascii(file_name_string.as_bytes().to_owned())
-                .with_context(|| format!(
-                    "File name of {} is not valid ASCII",
-                    file.path().to_string_lossy(),
-                ))?;
-            let ascii_ext = match file.path().extension() {
-                Some(e) => {
-                    let e_owned = e.to_string_lossy().into_owned();
-                    AsciiString::from_ascii(e_owned.as_bytes().to_owned()).with_context(|| format!(
-                        "File extension of {} is not valid ASCII",
+            let file_name_string = file.file_name().to_string_lossy().into_owned();
+            if !g2_added_files.contains(&file_name_string) {
+                let ascii_name = AsciiString::from_ascii(file_name_string.as_bytes().to_owned())
+                    .with_context(|| format!(
+                        "File name of {} is not valid ASCII",
                         file.path().to_string_lossy(),
-                    ))?.to_owned()
-                },
-                None => bail!("File {} has no extension", file.path().to_string_lossy()),
-            };
-            let fc = std::fs::read(file.path())
-                .with_context(|| format!(
-                    "Unable to read contents of file {}",
-                    file.path().to_string_lossy(),
-                ))?;
-            let mut of = new_ia.begin_file(&ascii_name, &ascii_ext, Group::Group2);
-            of.write_all(&fc[..])
-                .with_context(|| format!(
-                    "Unable to write contents of file {} to ICE file writer",
-                    file.path().to_string_lossy(),
-                ))?;
-            of.finish();
-            g2_added_files.insert(file_name_string);
+                    ))?;
+                let ascii_ext = match file.path().extension() {
+                    Some(e) => {
+                        let e_owned = e.to_string_lossy().into_owned();
+                        AsciiString::from_ascii(e_owned.as_bytes().to_owned()).with_context(|| format!(
+                            "File extension of {} is not valid ASCII",
+                            file.path().to_string_lossy(),
+                        ))?.to_owned()
+                    },
+                    None => bail!("File {} has no extension", file.path().to_string_lossy()),
+                };
+                let fc = std::fs::read(file.path())
+                    .with_context(|| format!(
+                        "Unable to read contents of file {}",
+                        file.path().to_string_lossy(),
+                    ))?;
+                let mut of = new_ia.begin_file(&ascii_name, &ascii_ext, Group::Group2);
+                of.write_all(&fc[..])
+                    .with_context(|| format!(
+                        "Unable to write contents of file {} to ICE file writer",
+                        file.path().to_string_lossy(),
+                    ))?;
+                of.finish();
+                g2_added_files.insert(file_name_string);
+            }
         }
     }
 

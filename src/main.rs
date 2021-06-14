@@ -402,7 +402,8 @@ fn main() {
     match iterate_patch_directory(&args.input, &args.datadir, Some(&args.datadir.join("backup")), args.verbose) {
         Ok(_) => {},
         Err(e) => {
-            eprintln!("pso2-modpatcher: {}", e.to_string());
+            
+            eprintln!("pso2-modpatcher: {}", e);
             return;
         },
     }

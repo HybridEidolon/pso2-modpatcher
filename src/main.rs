@@ -59,12 +59,26 @@ fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, v
                 // this is an ice file to patch
                 let ice_out = out.join(file_name_lossy.strip_suffix("_ice").unwrap());
                 let backup_file = backup_path.map(|p| p.join(file_name_lossy.strip_suffix("_ice").unwrap()));
-                apply_directory(&file_entry_path, &ice_out, backup_file.as_ref().map(|p| p.as_path()), verbose)?;
+
+                match apply_directory(&file_entry_path, &ice_out, backup_file.as_ref().map(|p| p.as_path()), verbose)
+                    .with_context(|| format!("Failed to patch ICE file {}", ice_out.to_string_lossy())) {
+                    Err(e) => {
+                        eprintln!("{:?}\nContinuing...", e);
+                    },
+                    _ => {},
+                }
             } else {
+                // this is another directory to iterate
                 let out_path = out.join(file_name);
                 let next_backup_path = backup_path.map(|p| p.join(file_name));
-                // this is another directory to iterate
-                iterate_patch_directory(&file_entry_path, &out_path, next_backup_path.as_ref().map(|p| p.as_path()), verbose)?;
+
+                match iterate_patch_directory(&file_entry_path, &out_path, next_backup_path.as_ref().map(|p| p.as_path()), verbose)
+                    .with_context(|| format!("Failed to apply directory {}", out_path.to_string_lossy())) {
+                    Err(e) => {
+                        eprintln!("{:?}\nContinuing...", e);
+                    },
+                    _ => {},
+                }
             }
         }
     }

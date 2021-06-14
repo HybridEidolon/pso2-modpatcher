@@ -105,15 +105,22 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
     }
 
     if let Some(backup_file) = backup_file {
-        if let Some(_backup_parent) = backup_file.parent() {
-            std::fs::copy(out_file, backup_file)
-                .with_context(|| format!(
-                    "Failed to copy the target ICE file {} to the backup path {}",
-                    out_file.to_string_lossy(),
-                    backup_file.to_string_lossy(),
-                ))?;
+        if !backup_file.exists() {
+            if let Some(_backup_parent) = backup_file.parent() {
+                if verbose {
+                    eprintln!("Backing up {} to {}", out_file.to_string_lossy(), backup_file.to_string_lossy());
+                }
+                std::fs::copy(out_file, backup_file)
+                    .with_context(|| format!(
+                        "Failed to copy the target ICE file {} to the backup path {}",
+                        out_file.to_string_lossy(),
+                        backup_file.to_string_lossy(),
+                    ))?;
+            } else {
+                panic!("backup path parent does not exist");
+            }
         } else {
-            panic!("backup path parent does not exist");
+            eprintln!("Backup file {} exists; not replacing it with a new backup", backup_file.to_string_lossy());
         }
     }
 

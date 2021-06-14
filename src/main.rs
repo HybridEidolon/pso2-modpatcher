@@ -16,11 +16,14 @@ struct Args {
     #[structopt(parse(from_os_str), help = "Patch path to apply")]
     input: PathBuf,
 
-    #[structopt(parse(from_os_str), help = "data directory to patch")]
+    #[structopt(parse(from_os_str), help = "Data directory to patch")]
     datadir: PathBuf,
+
+    #[structopt(long = "verbose", short = "v", help = "Print additional work information to stderr")]
+    verbose: bool,
 }
 
-fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>) -> anyhow::Result<()> {
+fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, verbose: bool) -> anyhow::Result<()> {
     if !src.is_dir() {
         panic!("src is not a directory");
     }
@@ -35,6 +38,10 @@ fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>) -
             std::fs::create_dir_all(backup_path)
                 .with_context(|| "Failed to make backup directory")?;
         }
+    }
+
+    if verbose {
+        eprintln!("Working on patch source directory {}", src.to_string_lossy());
     }
 
     let read_dir = src.read_dir().with_context(|| format!("Failed to iterate over patch directory {}", src.to_string_lossy()))?;
@@ -52,12 +59,12 @@ fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>) -
                 // this is an ice file to patch
                 let ice_out = out.join(file_name_lossy.strip_suffix("_ice").unwrap());
                 let backup_file = backup_path.map(|p| p.join(file_name_lossy.strip_suffix("_ice").unwrap()));
-                apply_directory(&file_entry_path, &ice_out, backup_file.as_ref().map(|p| p.as_path()))?;
+                apply_directory(&file_entry_path, &ice_out, backup_file.as_ref().map(|p| p.as_path()), verbose)?;
             } else {
                 let out_path = out.join(file_name);
                 let next_backup_path = backup_path.map(|p| p.join(file_name));
                 // this is another directory to iterate
-                iterate_patch_directory(&file_entry_path, &out_path, next_backup_path.as_ref().map(|p| p.as_path()))?;
+                iterate_patch_directory(&file_entry_path, &out_path, next_backup_path.as_ref().map(|p| p.as_path()), verbose)?;
             }
         }
     }
@@ -65,7 +72,7 @@ fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>) -
     Ok(())
 }
 
-fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>) -> anyhow::Result<()> {
+fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>, verbose: bool) -> anyhow::Result<()> {
     // The patch_src is assumed to contain two directories, 1 and 2
     // Each correspond to a group in the out_file ICE to replace files in
 
@@ -91,6 +98,10 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
     }
     if !src_1.exists() && !src_2.exists() {
         bail!("Patch directory {} does not contain any files to patch", patch_src.to_string_lossy());
+    }
+
+    if verbose {
+        eprintln!("Patching ICE file {}", out_file.to_string_lossy());
     }
 
     if let Some(backup_file) = backup_file {
@@ -381,7 +392,7 @@ fn main() {
     }
 
     // apply_directory(&args.input, &args.datadir)?;
-    match iterate_patch_directory(&args.input, &args.datadir, Some(&args.datadir.join("backup"))) {
+    match iterate_patch_directory(&args.input, &args.datadir, Some(&args.datadir.join("backup")), args.verbose) {
         Ok(_) => {},
         Err(e) => {
             eprintln!("pso2-modpatcher: {}", e.to_string());

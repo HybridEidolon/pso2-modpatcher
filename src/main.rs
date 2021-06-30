@@ -160,7 +160,9 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
         );
     }
 
-    let compress = (orig_ia.is_compressed(Group::Group1) || orig_ia.is_compressed(Group::Group2)) && orig_ia.is_oodle();
+    // compression is disabled because the kraken encoder is broken :(
+    // let compress = (orig_ia.is_compressed(Group::Group1) || orig_ia.is_compressed(Group::Group2)) && orig_ia.is_oodle();
+    let compress = false;
     let encrypt = orig_ia.is_encrypted();
     let oodle = (orig_ia.is_compressed(Group::Group1) || orig_ia.is_compressed(Group::Group2)) && orig_ia.is_oodle();
     

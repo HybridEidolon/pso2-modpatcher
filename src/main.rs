@@ -95,6 +95,12 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
         panic!("patch src was not a directory");
     }
 
+    if !out_file.exists() {
+        // not a failure, but we can't apply this patch
+        eprintln!("{} missing; skipping", out_file.to_string_lossy());
+        return Ok(());
+    }
+
     if !out_file.is_file() {
         panic!("out file is not a file");
     }

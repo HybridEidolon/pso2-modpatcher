@@ -21,6 +21,9 @@ struct Args {
 
     #[structopt(long = "verbose", short = "v", help = "Print additional work information to stderr")]
     verbose: bool,
+
+    #[structopt(long = "no-backup", help = "Don't create a backup of the patched files")]
+    no_backup: bool,
 }
 
 fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, verbose: bool) -> anyhow::Result<()> {
@@ -420,8 +423,15 @@ fn main() {
         std::process::exit(1);
     }
 
+    let backup_dir;
+    if args.no_backup {
+        backup_dir = None;
+    } else {
+        backup_dir = Some(args.datadir.join("backup"));
+    }
+
     // apply_directory(&args.input, &args.datadir)?;
-    match iterate_patch_directory(&args.input, &args.datadir, Some(&args.datadir.join("backup")), args.verbose) {
+    match iterate_patch_directory(&args.input, &args.datadir, backup_dir.as_ref().map(|v| v.as_path()), args.verbose) {
         Ok(_) => {},
         Err(e) => {
             

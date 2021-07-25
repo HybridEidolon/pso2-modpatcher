@@ -127,13 +127,21 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
         eprintln!("Patching ICE file {}", out_file.to_string_lossy());
     }
 
+    let orig_ia_file = File::open(out_file)
+        .with_context(|| format!("Failed to open target ICE file \"{}\"", out_file.to_string_lossy()))?;
+    let orig_ia = IceArchive::load(orig_ia_file)
+        .with_context(|| format!(
+            "Failed to load \"{}\" as an ICE",
+            out_file.to_string_lossy(),
+        ))?;
+
     if let Some(backup_file) = backup_file {
         if !backup_file.exists() {
             if let Some(_backup_parent) = backup_file.parent() {
                 if verbose {
                     eprintln!("Backing up {} to {}", out_file.to_string_lossy(), backup_file.to_string_lossy());
                 }
-                std::fs::copy(out_file, backup_file)
+                std::fs::rename(out_file, backup_file)
                     .with_context(|| format!(
                         "Failed to copy the target ICE file {} to the backup path {}",
                         out_file.to_string_lossy(),
@@ -146,14 +154,6 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
             eprintln!("Backup file {} exists; not replacing it with a new backup", backup_file.to_string_lossy());
         }
     }
-
-    let orig_ia_file = File::open(out_file)
-        .with_context(|| format!("Failed to open target ICE file \"{}\"", out_file.to_string_lossy()))?;
-    let orig_ia = IceArchive::load(orig_ia_file)
-        .with_context(|| format!(
-            "Failed to load \"{}\" as an ICE",
-            out_file.to_string_lossy(),
-        ))?;
     
     if orig_ia.version() != 4 {
         bail!(

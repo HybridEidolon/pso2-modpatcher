@@ -54,7 +54,6 @@ impl PatcherApp {
     }
 }
 
-#[cfg(windows)]
 pub enum PatcherEvent {
     Progress,
 }

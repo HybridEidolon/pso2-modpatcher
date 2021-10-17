@@ -479,7 +479,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel::<PatcherEvent>();
 
     #[cfg(windows)]
     if args.gui {

@@ -4,11 +4,60 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{atomic::{AtomicU64, Ordering}, mpsc};
 
 use anyhow::{bail, Context};
 use ascii::{AsciiStr, AsciiString};
 use structopt::StructOpt;
 
+#[cfg(windows)]
+use nwg::NativeUi;
+
+#[cfg(windows)]
+use nwd::NwgUi;
+
+
+#[cfg(windows)]
+#[derive(Default, NwgUi)]
+pub struct PatcherApp {
+    #[nwg_control(size: (300, 120), title: "Patcher", flags: "VISIBLE")]
+    #[nwg_events( OnWindowClose: [PatcherApp::on_quit] )]
+    window: nwg::Window,
+
+    #[nwg_control(parent: window)]
+    #[nwg_events( OnNotice: [PatcherApp::on_notice] )]
+    notice: nwg::Notice,
+
+    #[nwg_layout(parent: window, spacing: 2, margin: [8, 8, 8, 8], min_size: [150, 60])]
+    layout: nwg::GridLayout,
+
+    #[nwg_control(text: "Patching...")]
+    #[nwg_layout_item(layout: layout, col: 0, row: 0, col_span: 5)]
+    label: nwg::Label,
+
+    #[nwg_control(text: "0 files patched")]
+    #[nwg_layout_item(layout: layout, col: 0, row: 1, col_span: 5)]
+    progress_label: nwg::Label,
+
+    patched_files: AtomicU64,
+}
+
+#[cfg(windows)]
+impl PatcherApp {
+    fn on_quit(&self) {
+        nwg::stop_thread_dispatch();
+    }
+
+    fn on_notice(&self) {
+        let patched_files = self.patched_files.fetch_add(1, Ordering::Relaxed) + 1;
+        self.progress_label.set_text(&format!("{} files patched", patched_files));
+    }
+}
+
+#[cfg(windows)]
+pub enum PatcherEvent {
+    Progress,
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "pso2-modpatcher", about = "Tool for repacking ICE archives in a directory with new files")]
@@ -24,9 +73,13 @@ struct Args {
 
     #[structopt(long = "no-backup", help = "Don't create a backup of the patched files")]
     no_backup: bool,
+
+    #[cfg(windows)]
+    #[structopt(long = "gui", help = "Show a gui window during patching instead of a console (Windows only)")]
+    gui: bool,
 }
 
-fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, verbose: bool) -> anyhow::Result<()> {
+fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, verbose: bool, events: mpsc::Sender<PatcherEvent>) -> anyhow::Result<()> {
     if !src.is_dir() {
         panic!("src is not a directory");
     }
@@ -63,7 +116,7 @@ fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, v
                 let ice_out = out.join(file_name_lossy.strip_suffix("_ice").unwrap());
                 let backup_file = backup_path.map(|p| p.join(file_name_lossy.strip_suffix("_ice").unwrap()));
 
-                match apply_directory(&file_entry_path, &ice_out, backup_file.as_ref().map(|p| p.as_path()), verbose)
+                match apply_directory(&file_entry_path, &ice_out, backup_file.as_ref().map(|p| p.as_path()), verbose, events.clone())
                     .with_context(|| format!("Failed to patch ICE file {}", ice_out.to_string_lossy())) {
                     Err(e) => {
                         eprintln!("{:?}\nContinuing...", e);
@@ -75,7 +128,7 @@ fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, v
                 let out_path = out.join(file_name);
                 let next_backup_path = backup_path.map(|p| p.join(file_name));
 
-                match iterate_patch_directory(&file_entry_path, &out_path, next_backup_path.as_ref().map(|p| p.as_path()), verbose)
+                match iterate_patch_directory(&file_entry_path, &out_path, next_backup_path.as_ref().map(|p| p.as_path()), verbose, events.clone())
                     .with_context(|| format!("Failed to apply directory {}", out_path.to_string_lossy())) {
                     Err(e) => {
                         eprintln!("{:?}\nContinuing...", e);
@@ -89,7 +142,7 @@ fn iterate_patch_directory(src: &Path, out: &Path, backup_path: Option<&Path>, v
     Ok(())
 }
 
-fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>, verbose: bool) -> anyhow::Result<()> {
+fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>, verbose: bool, events: mpsc::Sender<PatcherEvent>) -> anyhow::Result<()> {
     // The patch_src is assumed to contain two directories, 1 and 2
     // Each correspond to a group in the out_file ICE to replace files in
 
@@ -400,6 +453,9 @@ fn apply_directory(patch_src: &Path, out_file: &Path, backup_file: Option<&Path>
             out_file.to_string_lossy(),
         ))?;
 
+    // event sender is allowed to fail (for no receivers)
+    let _e = events.send(PatcherEvent::Progress);
+
     Ok(())
 }
 
@@ -423,6 +479,31 @@ fn main() {
         std::process::exit(1);
     }
 
+    let (tx, rx) = mpsc::channel();
+
+    #[cfg(windows)]
+    if args.gui {
+        unsafe { winapi::um::wincon::FreeConsole(); }
+        std::thread::spawn(move || {
+            nwg::init().unwrap();
+            nwg::Font::set_global_family("Segoe UI").unwrap();
+            let gui = PatcherApp::build_ui(Default::default()).unwrap();
+            let notice_sender = gui.notice.sender();
+            std::thread::spawn(move || {
+                loop {
+                    let _evt = match rx.recv() {
+                        Ok(e) => e,
+                        Err(_e) => break,
+                    };
+                    notice_sender.notice();
+                }
+            });
+            nwg::dispatch_thread_events();
+        });
+    } else {
+        drop(rx);
+    }
+
     let backup_dir;
     if args.no_backup {
         backup_dir = None;
@@ -431,7 +512,7 @@ fn main() {
     }
 
     // apply_directory(&args.input, &args.datadir)?;
-    match iterate_patch_directory(&args.input, &args.datadir, backup_dir.as_ref().map(|v| v.as_path()), args.verbose) {
+    match iterate_patch_directory(&args.input, &args.datadir, backup_dir.as_ref().map(|v| v.as_path()), args.verbose, tx.clone()) {
         Ok(_) => {},
         Err(e) => {
             

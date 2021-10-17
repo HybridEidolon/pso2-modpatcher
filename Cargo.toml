@@ -10,3 +10,8 @@ ages-ice-archive = "0.3.1"
 anyhow = "1"
 ascii = "1"
 structopt = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+nwg = { version = "^1.0.12", package = "native-windows-gui", features = ["notice"] }
+nwd = { version = "^1.0.3", package = "native-windows-derive" }
+winapi = { version = "0.3", features = ["consoleapi", "wincon"] }
